@@ -20,10 +20,20 @@ class TodoeyTableViewController: UITableViewController {
 //        if let items = defaults.array(forKey: "TodoListArray") as? [String] {
 //            itemArray = items
 //        }
-        itemArray.append(Item(title: "Find Mike", done: false))
-        itemArray.append(Item(title: "Buy Eggos", done: false))
-        itemArray.append(Item(title: "Destroy Demogorgon", done: false))
-        itemArray.append(Item(title: "Find Mike", done: false))
+        if let decodedArray = defaults.data(forKey: "TodoListArray") {
+            if #available(iOS 12.0, *) {
+                guard let items = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(decodedArray) as? [Item] else { return }
+                itemArray = items
+            } else {
+                guard let items = NSKeyedUnarchiver.unarchiveObject(with: decodedArray) as? [Item] else { return }
+                itemArray = items
+            }
+        } else {
+            itemArray.append(Item(title: "Find Mike", done: false))
+            itemArray.append(Item(title: "Buy Eggos", done: false))
+            itemArray.append(Item(title: "Destroy Demogorgon", done: false))
+            itemArray.append(Item(title: "Find Mike", done: false))
+        }
     }
 
     // MARK: - TableView Datasource Methods
@@ -72,7 +82,17 @@ class TodoeyTableViewController: UITableViewController {
             self.itemArray.append(item)
             
             /*UserDefaults*/
-            self.defaults.set(self.itemArray, forKey: "TodoListArray")
+            if #available(iOS 11.0, *) {
+                do {
+                    let encodedData = try NSKeyedArchiver.archivedData(withRootObject: self.itemArray, requiringSecureCoding: false)
+                    self.updateData(data: encodedData)
+                } catch {
+                    print(error)
+                }
+            } else {
+                let encodedData = NSKeyedArchiver.archivedData(withRootObject: self.itemArray)
+                self.updateData(data: encodedData)
+            }
             
             self.tableView.reloadData()
         }
@@ -81,5 +101,10 @@ class TodoeyTableViewController: UITableViewController {
         
         present(alert, animated: true, completion: nil)
         
+    }
+    
+    func updateData(data: Data) {
+        self.defaults.set(data, forKey: "TodoListArray")
+        self.defaults.synchronize()
     }
 }
