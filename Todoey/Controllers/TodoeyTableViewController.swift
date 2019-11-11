@@ -7,33 +7,23 @@
 //
 
 import UIKit
+import CoreData
 
 class TodoeyTableViewController: UITableViewController {
+ 
     
-    var itemArray = [Item]()
+    @IBOutlet weak var searchBar: UISearchBar!
     
-    let defaults = UserDefaults.standard
+//    var itemArray = [Item]()
+    
+    var itemArray = ["Find Mike", "Buy Eggos", "Destory Demogorgon"]
+    
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        /*UserDefaults*/
-//        if let items = defaults.array(forKey: "TodoListArray") as? [String] {
-//            itemArray = items
-//        }
-        if let decodedArray = defaults.data(forKey: "TodoListArray") {
-            if #available(iOS 12.0, *) {
-                guard let items = try? NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(decodedArray) as? [Item] else { return }
-                itemArray = items
-            } else {
-                guard let items = NSKeyedUnarchiver.unarchiveObject(with: decodedArray) as? [Item] else { return }
-                itemArray = items
-            }
-        } else {
-            itemArray.append(Item(title: "Find Mike", done: false))
-            itemArray.append(Item(title: "Buy Eggos", done: false))
-            itemArray.append(Item(title: "Destroy Demogorgon", done: false))
-            itemArray.append(Item(title: "Find Mike", done: false))
-        }
+        searchBar.delegate = self
+        loadItems()
     }
 
     // MARK: - TableView Datasource Methods
@@ -45,8 +35,11 @@ class TodoeyTableViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "TodoItemCell", for: indexPath)
         let item = itemArray[indexPath.row]
-        cell.textLabel?.text = item.title
-        cell.accessoryType = item.done ? .checkmark : .none
+        
+        cell.textLabel?.text = item
+        
+//        cell.textLabel?.text = item.title
+//        cell.accessoryType = item.done ? .checkmark : .none
         return cell
     }
     
@@ -54,9 +47,9 @@ class TodoeyTableViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         
-        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
+//        itemArray[indexPath.row].done = !itemArray[indexPath.row].done
         
-        tableView.reloadData()
+//        saveItems()
         
         tableView.deselectRow(at: indexPath, animated: true)
         
@@ -78,23 +71,12 @@ class TodoeyTableViewController: UITableViewController {
         
         let action = UIAlertAction(title: "Add Item", style: .default) { (action) in
             
-            let item = Item(title: textField.text!, done: false)
-            self.itemArray.append(item)
+            let newItem = Item(context: self.context)
+            newItem.title = textField.text
+            newItem.done = false
+//            self.itemArray.append(newItem)
             
-            /*UserDefaults*/
-            if #available(iOS 11.0, *) {
-                do {
-                    let encodedData = try NSKeyedArchiver.archivedData(withRootObject: self.itemArray, requiringSecureCoding: false)
-                    self.updateData(data: encodedData)
-                } catch {
-                    print(error)
-                }
-            } else {
-                let encodedData = NSKeyedArchiver.archivedData(withRootObject: self.itemArray)
-                self.updateData(data: encodedData)
-            }
-            
-            self.tableView.reloadData()
+            self.saveItems()
         }
         
         alert.addAction(action)
@@ -103,8 +85,44 @@ class TodoeyTableViewController: UITableViewController {
         
     }
     
-    func updateData(data: Data) {
-        self.defaults.set(data, forKey: "TodoListArray")
-        self.defaults.synchronize()
+    private func saveItems() {
+        do {
+            try self.context.save()
+        } catch {
+            print("Error saving context \(error)")
+        }
+        self.tableView.reloadData()
+    }
+    
+    private func loadItems(with request: NSFetchRequest<Item> = Item.fetchRequest()) {
+        do {
+//            itemArray = try context.fetch(request)
+        } catch {
+            print("Error fetching data from context \(error)")
+        }
+        tableView.reloadData()
+    }
+}
+
+// MARK: - Search bar methods
+extension TodoeyTableViewController: UISearchBarDelegate {
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request: NSFetchRequest<Item> = Item.fetchRequest()
+        
+        request.predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        loadItems(with: request)
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchBar.text?.count == 0 {
+            loadItems()
+            DispatchQueue.main.async {
+                searchBar.resignFirstResponder()
+            }
+            
+        }
     }
 }
